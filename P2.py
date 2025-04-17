@@ -1,84 +1,71 @@
 from collections import defaultdict
-from typing import List, Set
 from heapq import heappush, heappop
 
-def find_shortest_path(n: int, e: int, enemies: Set[int], jump_platforms: dict) -> int:
-    """
-    n: número total de plataformas
-    e: unidades de energía
-    enemies: conjunto de plataformas con enemigos
-    jump_platforms: diccionario donde key=plataforma, value=cantidad de saltos permitidos
-    """
-    
-    # Inicializamos dp como un diccionario de diccionarios
-    # dp[pos][energy] = mínimo número de movimientos para llegar a la plataforma n
+def find_shortest_path(n: int, e: int, enemies: set[int], jump_platforms: dict) -> int:
     dp = defaultdict(lambda: defaultdict(lambda: float('inf')))
+    predecessor = defaultdict(dict)  # predecessor[pos][energy] = (prev_pos, prev_energy, action)
     
-    # Cola de prioridad: (movimientos, posición, energía)
-    pq = [(0, 0, e)]  # Comenzamos en la posición 0 con e unidades de energía
+    pq = [(0, 0, e)]
     dp[0][e] = 0
-    
-    path = []
     
     while pq:
         moves, pos, energy = heappop(pq)
         
-        # Si llegamos a la última plataforma
         if pos == n:
+            # Reconstruir el camino
+            path = []
+            current_pos, current_energy = pos, energy
+            while True:
+                prev_info = predecessor.get(current_pos, {}).get(current_energy, None)
+                if prev_info is None:
+                    break
+                prev_pos, prev_energy, action = prev_info
+                path.append(f"{action} -> {current_pos}")
+                current_pos, current_energy = prev_pos, prev_energy
+            path.append(f"Inicio -> 0")
+            path.reverse()
+            print("Camino tomado:", " | ".join(path))
             return moves
             
-        # Si esta no es la mejor forma de llegar a esta posición con esta energía
         if moves > dp[pos][energy]:
             continue
             
-        # Movimientos básicos (adelante y atrás)
+        # Movimientos básicos
         for next_pos in [pos + 1, pos - 1]:
             if 0 <= next_pos <= n and next_pos not in enemies:
                 if moves + 1 < dp[next_pos][energy]:
                     dp[next_pos][energy] = moves + 1
-                    # print(f"Moviendo a {next_pos} desde {pos}")
+                    action = "C+" if next_pos > pos else "C-"
+                    predecessor[next_pos][energy] = (pos, energy, action)
                     heappush(pq, (moves + 1, next_pos, energy))
-        
-        # Saltar si la plataforma actual lo permite
+                    
+        # Saltos desde plataforma
         if pos in jump_platforms:
-            jumps = jump_platforms[pos]
-            for next_pos in [pos + jumps, pos - jumps]:
+            jump = jump_platforms[pos]
+            for next_pos in [pos + jump, pos - jump]:
                 if 0 <= next_pos <= n and next_pos not in enemies:
                     if moves + 1 < dp[next_pos][energy]:
                         dp[next_pos][energy] = moves + 1
-                        # print(f"Saltando a {next_pos} desde {pos}")
+                        action = f"S+{jump}" if next_pos > pos else f"S-{jump}"
+                        predecessor[next_pos][energy] = (pos, energy, action)
                         heappush(pq, (moves + 1, next_pos, energy))
         
-        # Usar energía para teletransporte
+        # Teletransporte con energía
         if energy > 0:
             for e_used in range(1, energy + 1):
                 for next_pos in [pos + e_used, pos - e_used]:
                     if 0 <= next_pos <= n and next_pos not in enemies:
-                        if moves + 1 < dp[next_pos][energy - e_used]:
-                            dp[next_pos][energy - e_used] = moves + 1
-                            # print(f"Usando {e_used} energía para mover a {next_pos} desde {pos}")
-                            heappush(pq, (moves + 1, next_pos, energy - e_used))
+                        new_energy = energy - e_used
+                        if moves + 1 < dp[next_pos][new_energy]:
+                            dp[next_pos][new_energy] = moves + 1
+                            action = f"T+{e_used}" if next_pos > pos else f"T-{e_used}"
+                            predecessor[next_pos][new_energy] = (pos, energy, action)
+                            heappush(pq, (moves + 1, next_pos, new_energy))
     
-    return -1  # No hay camino posible
+    return -1
 
-# Ejemplo de uso
+# Ejemplo de uso (se mantiene igual)
 def main():
-    # Ejemplo de entrada
-    # n = 14  # 10 plataformas
-    # e = 2   # 5 unidades de energía
-    # enemies = {4, 5, 7, 9, 10, 12}  # Plataformas con enemigos
-    # teleport_platforms = {1: 7, 3: 2, 6: 5, 11: 3}  # Plataforma 2 permite saltar 3 espacios, plataforma 5 permite saltar 4
-    
-    # n = 14
-    # e = 3
-    # enemies = {4, 5, 7, 9, 10, 12}
-    # teleport_platforms = {1: 7, 3: 2, 6: 5, 11: 3}
-    
-    # n = 9
-    # e = 2
-    # enemies = {4, 5, 7}
-    # teleport_platforms = {1: 3, 3: 2, 6: 5}
-    
     n = 32
     e = 4
     enemies = {3, 7, 10, 13, 14, 17, 20, 24, 27, 29, 31}
