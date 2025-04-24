@@ -1,3 +1,6 @@
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
 
 /**
@@ -28,7 +31,7 @@ public class ProblemaP2 {
      * @param jumpPlatforms mapa de plataformas con salto especial (plataforma->k)
      * @return número mínimo de acciones, o -1 si no es posible
      */
-    public static int findShortestPath(int n, int e, Set<Integer> enemies, Map<Integer,Integer> jumpPlatforms) {
+    public int findShortestPath(int n, int e, Set<Integer> enemies, Map<Integer,Integer> jumpPlatforms) {
         final int INF = Integer.MAX_VALUE / 2;
         int[][] dp = new int[n+1][e+1];               // dp[pos][energy] = mín. acciones
         PreState[][] predecessor = new PreState[n+1][e+1];
@@ -111,27 +114,42 @@ public class ProblemaP2 {
     }
 
     public static void main(String[] args) {
-        // Ejemplo hardcodeado (como en P2.py)
-        int n = 32;
-        int e = 4;
-        Set<Integer> enemies = new HashSet<>(Arrays.asList(3, 7, 10, 13, 14, 17, 20, 24, 27, 29, 31));
-        Map<Integer,Integer> jumpPlatforms = new HashMap<>();
-        jumpPlatforms.put(1, 6);
-        jumpPlatforms.put(4, 2);
-        jumpPlatforms.put(6, 20);
-        jumpPlatforms.put(8, 4);
-        jumpPlatforms.put(11, 3);
-        jumpPlatforms.put(15, 5);
-        jumpPlatforms.put(18, 2);
-        jumpPlatforms.put(22, 4);
-        jumpPlatforms.put(25, 3);
-        jumpPlatforms.put(28, 2);
+        ProblemaP2 instancia = new ProblemaP2();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
+            int casos = Integer.parseInt(br.readLine().trim());
+            for (int i = 0; i < casos; i++) {
+                // Línea 1: n e
+                String line = br.readLine();
+                if (line == null || line.isEmpty()) break;
+                String[] dataStr1 = line.split(" ");
+                int n = Integer.parseInt(dataStr1[0]);
+                int e = Integer.parseInt(dataStr1[1]);
 
-        int result = findShortestPath(n, e, enemies, jumpPlatforms);
-        if (result != -1) {
-            System.out.println("El número mínimo de movimientos necesarios es: " + result);
-        } else {
-            System.out.println("NO SE PUEDE");
+                // Línea 2: plataformas con robots
+                String linea2 = br.readLine();
+                String[] dataStr2 = linea2.split(" ");
+                Set<Integer> enemies = new HashSet<>();
+                for (String s : dataStr2) enemies.add(Integer.parseInt(s));
+
+                // Línea 3: pares p_i s_i
+                String linea3 = br.readLine();
+                String[] dataStr3 = linea3.split(" ");
+                Map<Integer,Integer> jumpPlatforms = new HashMap<>();
+                for (int k = 0; k < dataStr3.length; k += 2) {
+                    int pi = Integer.parseInt(dataStr3[k]);
+                    int si = Integer.parseInt(dataStr3[k+1]);
+                    jumpPlatforms.put(pi, si);
+                }
+
+                int result = instancia.findShortestPath(n, e, enemies, jumpPlatforms);
+                if (result != -1) {
+                    System.out.println(result);
+                } else {
+                    System.out.println("NO SE PUEDE");
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("Error al leer la entrada: " + ex.getMessage());
         }
     }
 }
