@@ -1,0 +1,3 @@
+cd [ruta del archivo]
+javac ProblemaP2.java
+java ProblemaP2 < entrada.IN > salida.OUT
