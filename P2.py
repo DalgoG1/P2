@@ -1,19 +1,27 @@
 from collections import defaultdict
 from heapq import heappush, heappop
 
-def find_shortest_path(n: int, e: int, enemies: set[int], jump_platforms: dict) -> int:
+def find_shortest_path(n: int, e: int, enemies: set[int], jump_platforms: dict) -> list[str]:
     dp = defaultdict(lambda: defaultdict(lambda: float('inf')))
     predecessor = defaultdict(dict)  # predecessor[pos][energy] = (prev_pos, prev_energy, action)
     
     pq = [(0, 0, e)]
     dp[0][e] = 0
+    path = []
+    
+    
+    if e >= n:
+        return 1
+    if 0 in enemies:
+        return -1
+    if n in enemies:
+        return -1
     
     while pq:
         moves, pos, energy = heappop(pq)
         
         if pos == n:
             # Reconstruir el camino
-            path = []
             current_pos, current_energy = pos, energy
             while True:
                 prev_info = predecessor.get(current_pos, {}).get(current_energy, None)
@@ -65,18 +73,33 @@ def find_shortest_path(n: int, e: int, enemies: set[int], jump_platforms: dict) 
     return -1
 
 # Ejemplo de uso (se mantiene igual)
+import random
+from random import randint
+
 def main():
-    n = 32
-    e = 4
-    enemies = {3, 7, 10, 13, 14, 17, 20, 24, 27, 29, 31}
-    teleport_platforms = {1: 6, 4: 2, 6:20, 8: 4, 11: 3, 15: 5, 18: 2, 22: 4, 25: 3, 28: 2}
+    random.seed(42)  # Para reproducibilidad
+    n = 10**5       # 100,000 plataformas
+    e = (500000)  # Energía aleatoria
+    enemies = set()
+    jump_platforms = {}
     
-    result = find_shortest_path(n, e, enemies, teleport_platforms)
+    # Generar enemigos (30% de las plataformas, excluyendo 0 y n)
+    for pos in range(1, n):
+        if random.random() < 0.3:  # 30% de probabilidad de ser enemigo
+            enemies.add(pos)
     
-    if result != -1:
-        print(f"El número mínimo de movimientos necesarios es: {result}")
-    else:
-        print("NO SE PUEDE")
+    # Generar plataformas de salto (20% de las plataformas no enemigas)
+    for pos in range(n):
+        if pos not in enemies and random.random() < 0.2:
+            jump = randint(1, 1000)  # Salto aleatorio entre 1 y 1000
+            jump_platforms[pos] = jump
+    
+    # Asegurar que haya al menos un camino válido (0 → 50000 → n)
+    if 50000 not in enemies:
+        jump_platforms[50000] = n - 50000  # Salto directo a n
+    
+    result = find_shortest_path(n, e, enemies, jump_platforms)
+    print(f"Movimientos mínimos: {result}")
 
 if __name__ == "__main__":
     main()
