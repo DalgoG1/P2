@@ -1,155 +1,210 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.*;
 
 /**
- * Traducción de P2.py a Java para el problema "Samus y el laberinto de Zebes".
+ * ISIS 1105 Diseño y Análisis de Algoritmos
+ * Semestre 2025-10. Proyecto - PARTE2
+ * Grupo 1
+ * Integrantes:
+ * Mattia Riccardi Rodriguez 202321259
+ * Nicolas Arango Ramos 202220342
  */
+
 public class ProblemaP2 {
-    // Clase para almacenar el estado previo y la acción tomada
-    static class PreState {
-        int prevPos, prevEnergy;
-        String action;
-        PreState(int p, int e, String a) { prevPos = p; prevEnergy = e; action = a; }
-    }
-
-    // Clase para el estado en la cola de prioridad (Dijkstra sobre (pos, energía))
-    static class State implements Comparable<State> {
-        int moves, pos, energy;
-        State(int m, int p, int e) { moves = m; pos = p; energy = e; }
-        public int compareTo(State other) {
-            return Integer.compare(this.moves, other.moves);
-        }
-    }
-
     /**
-     * Busca el número mínimo de acciones para llegar de la plataforma 0 a n.
-     * @param n número de la plataforma final
-     * @param e energía inicial
-     * @param enemies conjunto de plataformas con robots (prohibidas)
-     * @param jumpPlatforms mapa de plataformas con salto especial (plataforma->k)
-     * @return número mínimo de acciones, o -1 si no es posible
+     * Encuentra el camino mas corto en terminos de acciones para que Samus llegue a la ultima plataforma.
+     * 
+     * @param n Numero de plataformas (sin contar la inicial)
+     * @param e Unidades de energia iniciales
+     * @param enemies Conjunto de plataformas con robots asesinos
+     * @param jumpPlatforms Diccionario que mapea plataformas con poderes y la distancia de salto
+     * @return Una tupla (numero de acciones, lista de acciones) o (-1, lista vacia) si no hay solucion
      */
-    public int findShortestPath(int n, int e, Set<Integer> enemies, Map<Integer,Integer> jumpPlatforms) {
-        final int INF = Integer.MAX_VALUE / 2;
-        int[][] dp = new int[n+1][e+1];               // dp[pos][energy] = mín. acciones
-        PreState[][] predecessor = new PreState[n+1][e+1];
-        for (int i = 0; i <= n; i++) Arrays.fill(dp[i], INF);
-        dp[0][e] = 0;
-
-        PriorityQueue<State> pq = new PriorityQueue<>();
-        pq.offer(new State(0, 0, e));
-
+    public static Pair<Integer, List<String>> findShortestPath(int n, int e, Set<Integer> enemies, Map<Integer, Integer> jumpPlatforms) {
+        // Estados visitados: [posicion][energia] -> minimo numero de acciones
+        Map<Integer, Map<Integer, Integer>> dp = new HashMap<>();
+        // Para reconstruir el camino tomado
+        Map<Integer, Map<Integer, Triple<Integer, Integer, String>>> predecessor = new HashMap<>();
+        
+        // Cola de prioridad: (movimientos, posicion, energia)
+        PriorityQueue<int[]> pq = new PriorityQueue<>(
+            Comparator.comparingInt(a -> a[0])
+        );
+        
+        // Inicializar estructuras de datos
+        for (int i = 0; i <= n; i++) {
+            dp.put(i, new HashMap<>());
+            predecessor.put(i, new HashMap<>());
+        }
+        
+        // Verificar si hay robot en posicion 0 o n
+        if (enemies.contains(0) || enemies.contains(n)) {
+            return new Pair<>(-1, new ArrayList<>());
+        }
+        
+        // Inicializar punto de partida
+        pq.add(new int[]{0, 0, e});
+        dp.get(0).put(e, 0);
+        
         while (!pq.isEmpty()) {
-            State cur = pq.poll();
-            int moves = cur.moves, pos = cur.pos, energy = cur.energy;
-
+            int[] current = pq.poll();
+            int moves = current[0];
+            int pos = current[1];
+            int energy = current[2];
+            
+            // Si llegamos a la meta
             if (pos == n) {
-                // Reconstruir y mostrar el camino
-                List<String> path = new ArrayList<>();
-                int cp = pos, ce = energy;
-                while (predecessor[cp][ce] != null) {
-                    PreState ps = predecessor[cp][ce];
-                    path.add(ps.action + " -> " + cp);
-                    int tp = ps.prevPos, te = ps.prevEnergy;
-                    cp = tp; ce = te;
+                // Reconstruir el camino tomado
+                List<String> actions = new ArrayList<>();
+                int currentPos = pos;
+                int currentEnergy = energy;
+                
+                while (currentPos != 0 || currentEnergy != e) {
+                    Triple<Integer, Integer, String> prev = predecessor.get(currentPos).get(currentEnergy);
+                    actions.add(prev.third);
+                    currentPos = prev.first;
+                    currentEnergy = prev.second;
                 }
-                path.add("Inicio -> 0");
-                Collections.reverse(path);
-                System.out.println("Camino tomado: " + String.join(" | ", path));
-                return moves;
+                
+                // Invertir la lista de acciones
+                Collections.reverse(actions);
+                return new Pair<>(moves, actions);
             }
-            if (moves > dp[pos][energy]) continue;
-
-            // 1) Caminar (+1/-1)
-            for (int d : new int[]{1, -1}) {
-                int np = pos + d;
-                if (np >= 0 && np <= n && !enemies.contains(np)) {
-                    if (moves + 1 < dp[np][energy]) {
-                        dp[np][energy] = moves + 1;
-                        String act = d > 0 ? "C+" : "C-";
-                        predecessor[np][energy] = new PreState(pos, energy, act);
-                        pq.offer(new State(moves + 1, np, energy));
+            
+            // Si ya encontramos un camino mejor para este estado, continuamos
+            if (dp.get(pos).containsKey(energy) && moves > dp.get(pos).get(energy)) {
+                continue;
+            }
+            
+            // 1. Teletransportacion
+            for (int nextPos = 0; nextPos <= n; nextPos++) {
+                if (nextPos != pos && !enemies.contains(nextPos)) {
+                    int distance = Math.abs(nextPos - pos);
+                    if (distance <= energy) { // Verificar si tenemos suficiente energia
+                        int newEnergy = energy - distance;
+                        Integer currentBest = dp.get(nextPos).getOrDefault(newEnergy, Integer.MAX_VALUE);
+                        if (moves + 1 < currentBest) {
+                            dp.get(nextPos).put(newEnergy, moves + 1);
+                            int direction = nextPos - pos;
+                            String action = "T" + direction; // Asegurar formato T-x
+                            predecessor.get(nextPos).put(newEnergy, new Triple<>(pos, energy, action));
+                            pq.add(new int[]{moves + 1, nextPos, newEnergy});
+                        }
                     }
                 }
             }
-
-            // 2) Salto con poder (S+k / S-k)
+            
+            // 2. Usar poder de salto si estamos en una plataforma con poder
             if (jumpPlatforms.containsKey(pos)) {
-                int jump = jumpPlatforms.get(pos);
-                for (int d : new int[]{jump, -jump}) {
-                    int np = pos + d;
-                    if (np >= 0 && np <= n && !enemies.contains(np)) {
-                        if (moves + 1 < dp[np][energy]) {
-                            dp[np][energy] = moves + 1;
-                            String act = d > 0 ? "S+" + jump : "S-" + jump;
-                            predecessor[np][energy] = new PreState(pos, energy, act);
-                            pq.offer(new State(moves + 1, np, energy));
+                int jumpDistance = jumpPlatforms.get(pos);
+                int[][] jumps = {{jumpDistance, 1}, {-jumpDistance, -1}}; // (distancia, direccion)
+                
+                for (int[] jump : jumps) {
+                    int nextPos = pos + jump[0];
+                    String actionPrefix = "S" + (jump[1] > 0 ? "+" : "-");
+                    
+                    if (nextPos >= 0 && nextPos <= n && !enemies.contains(nextPos)) {
+                        Integer currentBest = dp.get(nextPos).getOrDefault(energy, Integer.MAX_VALUE);
+                        if (moves + 1 < currentBest) {
+                            dp.get(nextPos).put(energy, moves + 1);
+                            predecessor.get(nextPos).put(energy, new Triple<>(pos, energy, actionPrefix));
+                            pq.add(new int[]{moves + 1, nextPos, energy});
                         }
                     }
                 }
             }
-
-            // 3) Teletransportación (consume energía)
-            if (energy > 0) {
-                for (int used = 1; used <= energy; used++) {
-                    for (int d : new int[]{used, -used}) {
-                        int np = pos + d;
-                        int ne = energy - used;
-                        if (np >= 0 && np <= n && !enemies.contains(np)) {
-                            if (moves + 1 < dp[np][ne]) {
-                                dp[np][ne] = moves + 1;
-                                String act = d > 0 ? "T+" + used : "T-" + used;
-                                predecessor[np][ne] = new PreState(pos, energy, act);
-                                pq.offer(new State(moves + 1, np, ne));
-                            }
-                        }
+            
+            // 3. Movimientos basicos (caminar)
+            int[][] walks = {{1, 1}, {-1, -1}}; // (distancia, direccion)
+            
+            for (int[] walk : walks) {
+                int nextPos = pos + walk[0];
+                String action = "C" + (walk[1] > 0 ? "+" : "-");
+                
+                if (nextPos >= 0 && nextPos <= n && !enemies.contains(nextPos)) {
+                    Integer currentBest = dp.get(nextPos).getOrDefault(energy, Integer.MAX_VALUE);
+                    if (moves + 1 < currentBest) {
+                        dp.get(nextPos).put(energy, moves + 1);
+                        predecessor.get(nextPos).put(energy, new Triple<>(pos, energy, action));
+                        pq.add(new int[]{moves + 1, nextPos, energy});
                     }
                 }
             }
         }
-
-        return -1;  // No hay camino
+        
+        // Si llegamos aqui, no hay solucion
+        return new Pair<>(-1, new ArrayList<>());
     }
-
+    
     public static void main(String[] args) {
-        ProblemaP2 instancia = new ProblemaP2();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
-            int casos = Integer.parseInt(br.readLine().trim());
-            for (int i = 0; i < casos; i++) {
-                // Línea 1: n e
-                String line = br.readLine();
-                if (line == null || line.isEmpty()) break;
-                String[] dataStr1 = line.split(" ");
-                int n = Integer.parseInt(dataStr1[0]);
-                int e = Integer.parseInt(dataStr1[1]);
-
-                // Línea 2: plataformas con robots
-                String linea2 = br.readLine();
-                String[] dataStr2 = linea2.split(" ");
-                Set<Integer> enemies = new HashSet<>();
-                for (String s : dataStr2) enemies.add(Integer.parseInt(s));
-
-                // Línea 3: pares p_i s_i
-                String linea3 = br.readLine();
-                String[] dataStr3 = linea3.split(" ");
-                Map<Integer,Integer> jumpPlatforms = new HashMap<>();
-                for (int k = 0; k < dataStr3.length; k += 2) {
-                    int pi = Integer.parseInt(dataStr3[k]);
-                    int si = Integer.parseInt(dataStr3[k+1]);
-                    jumpPlatforms.put(pi, si);
-                }
-
-                int result = instancia.findShortestPath(n, e, enemies, jumpPlatforms);
-                if (result != -1) {
-                    System.out.println(result);
-                } else {
-                    System.out.println("NO SE PUEDE");
+        Scanner scanner = new Scanner(System.in);
+        int numCases = Integer.parseInt(scanner.nextLine());
+        
+        for (int i = 0; i < numCases; i++) {
+            // Leer datos del caso
+            String[] line = scanner.nextLine().split(" ");
+            int n = Integer.parseInt(line[0]);
+            int e = Integer.parseInt(line[1]);
+            
+            // Leer plataformas con robots
+            Set<Integer> enemies = new HashSet<>();
+            String enemiesLine = scanner.nextLine();
+            if (!enemiesLine.isEmpty()) {
+                String[] enemiesArr = enemiesLine.split(" ");
+                for (String enemy : enemiesArr) {
+                    enemies.add(Integer.parseInt(enemy));
                 }
             }
-        } catch (IOException ex) {
-            System.err.println("Error al leer la entrada: " + ex.getMessage());
+            
+            // Leer plataformas con poderes
+            Map<Integer, Integer> jumpPlatforms = new HashMap<>();
+            String powersLine = scanner.nextLine();
+            if (!powersLine.isEmpty()) {
+                String[] powersArr = powersLine.split(" ");
+                for (int j = 0; j < powersArr.length; j += 2) {
+                    if (j + 1 < powersArr.length) {
+                        int platform = Integer.parseInt(powersArr[j]);
+                        int jump = Integer.parseInt(powersArr[j + 1]);
+                        jumpPlatforms.put(platform, jump);
+                    }
+                }
+            }
+            
+            // Resolver el caso
+            Pair<Integer, List<String>> result = findShortestPath(n, e, enemies, jumpPlatforms);
+            
+            // Imprimir resultado
+            if (result.first == -1) {
+                System.out.println("NO SE PUEDE");
+            } else {
+                System.out.print(result.first + " ");
+                System.out.println(String.join(" ", result.second));
+            }
+        }
+        
+        scanner.close();
+    }
+    
+    // Clase auxiliar para devolver pares de valores
+    static class Pair<A, B> {
+        A first;
+        B second;
+        
+        Pair(A first, B second) {
+            this.first = first;
+            this.second = second;
+        }
+    }
+    
+    // Clase auxiliar para representar tripletas
+    static class Triple<A, B, C> {
+        A first;
+        B second;
+        C third;
+        
+        Triple(A first, B second, C third) {
+            this.first = first;
+            this.second = second;
+            this.third = third;
         }
     }
 }
